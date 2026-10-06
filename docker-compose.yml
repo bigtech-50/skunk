@@ -1,0 +1,77 @@
+version: '3'
+services:
+  # main instance for testing
+  postgres:
+    image: postgis/postgis:11-3.3
+    volumes:
+      - ./world/fix_perms.sh:/docker-entrypoint-initdb.d/fix_perms.sh
+      - ./world/world.sql:/docker-entrypoint-initdb.d/world.sql
+      - ./world/ltree.sql:/docker-entrypoint-initdb.d/ltree.sql
+      - ./world/config.sql:/docker-entrypoint-initdb.d/config.sql
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: jimmy
+      POSTGRES_PASSWORD: banana
+      POSTGRES_DB: world
+      SERVER_KEY: $SERVER_KEY
+      SERVER_CERT: $SERVER_CERT
+  # for testing password-free login
+  trust:
+    image: postgres:11
+    ports:
+      - 5433:5432
+    environment:
+      POSTGRES_DB: world
+      POSTGRES_HOST_AUTH_METHOD: trust
+  # for testing scram-sha-256 login
+  scram:
+    image: postgres:11
+    ports:
+      - 5434:5432
+    environment:
+      POSTGRES_DB: world
+      POSTGRES_USER: jimmy
+      POSTGRES_PASSWORD: banana
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+  # for testing clear-text password login
+  password:
+    image: postgres:11
+    ports:
+      - 5435:5432
+    environment:
+      POSTGRES_DB: world
+      POSTGRES_USER: jimmy
+      POSTGRES_PASSWORD: banana
+      POSTGRES_HOST_AUTH_METHOD: password
+      POSTGRES_INITDB_ARGS: --auth-host=password
+  # for testing domain sockets
+  unixsockets:
+    image: postgres:11
+    environment:
+      POSTGRES_DB: world
+      POSTGRES_USER: jimmy
+      POSTGRES_PASSWORD: banana
+    volumes:
+      - ./test-unix-socket:/var/run/postgresql
+  # for testing redshift connections
+  redshift:
+    image: guildeducation/docker-amazon-redshift
+    ports:
+      - 5439:5439
+
+  # Jaeger, for tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.35
+    ports:
+      - 5775:5775/udp
+      - 6831:6831/udp
+      - 6832:6832/udp
+      - 5778:5778
+      - 16686:16686
+      - 14268:14268
+      - 4317:4317
+      - 4318:4318
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"

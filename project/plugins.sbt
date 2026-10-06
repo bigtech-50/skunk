@@ -1,0 +1,14 @@
+// https://github.com/sbt/sbt/issues/6997
+ThisBuild / libraryDependencySchemes ++= Seq(
+  "org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always
+)
+
+addSbtPlugin("org.typelevel"      % "sbt-typelevel"                               % "0.8.7")
+addSbtPlugin("org.typelevel"      % "sbt-typelevel-site"                          % "0.8.7")
+addSbtPlugin("com.timushev.sbt"   % "sbt-updates"                                 % "0.7.0")
+addSbtPlugin("pl.project13.scala" % "sbt-jmh"                                     % "0.4.8")
+addSbtPlugin("org.scoverage"      % "sbt-scoverage"                               % "2.4.4")
+addSbtPlugin("org.scala-js"       % "sbt-scalajs"                                 % "1.22.0")
+addSbtPlugin("org.scala-native"   % "sbt-scala-native"                            % "0.5.12")
+addSbtPlugin("com.armanbilge"     % "sbt-scala-native-config-brew-github-actions" % "0.4.0")
+addSbtPlugin("com.eed3si9n"       % "sbt-buildinfo"                               % "0.13.1")

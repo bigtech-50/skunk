@@ -1,0 +1,91 @@
+// Copyright (c) 2018-2024 by Rob Norris and Contributors
+// This software is licensed under the MIT License (MIT).
+// For more information see LICENSE or https://opensource.org/licenses/MIT
+
+package skunk
+
+import cats.Contravariant
+import org.typelevel.otel4s.{Attribute, Attributes}
+import org.typelevel.twiddles.Iso
+import skunk.util.Origin
+import skunk.util.Twiddler
+
+/**
+ * SQL and parameter encoder for a statement that returns no rows. We assume that `sql` has the
+ * same number of placeholders of the form `$1`, `$2`, etc., as the number of slots encoded by
+ * `encoder`, and that the parameter types specified by `encoder` are consistent with the schema.
+ * The `check` methods on [[skunk.Session Session]] provide a means to verify this assumption.
+ *
+ * You can construct a `Command` directly, although it is more typical to use the `sql`
+ * interpolator.
+ *
+ * {{{
+ * sql"INSERT INTO foo VALUES ($int2, $varchar)".command // Command[(Short, String)]
+ * }}}
+ *
+ * @param sql A SQL statement returning no rows.
+ * @param encoder An encoder for all parameters `$1`, `$2`, etc., in `sql`.
+ *
+ * @see [[skunk.syntax.StringContextOps StringContextOps]] for information on the `sql`
+ *   interpolator.
+ * @see [[skunk.Session Session]] for information on executing a `Command`.
+ *
+ * @group Statements
+ */
+final case class Command[A](
+  override val sql:     String,
+  override val origin:  Origin,
+  override val encoder: Encoder[A],
+  override val telemetry: Statement.Telemetry = Statement.Telemetry.empty,
+) extends Statement[A] {
+
+  /** Attaches a low-cardinality summary used as `db.query.summary` and as the span name. Statement
+    * summaries take precedence over summaries returned by a configured query analyzer. The
+    * method is a shortcut for `addAttributes(DbAttributes.DbQuerySummary(summary))`.
+    */
+  def withQuerySummary(summary: String): Command[A] =
+    copy(telemetry = telemetry.withQuerySummary(summary))
+
+  /** Replaces the additional attributes exported on the logical database span. */
+  def withAttributes(attributes: Attributes): Command[A] =
+    copy(telemetry = telemetry.withAttributes(attributes))
+
+  /** Adds or replaces additional logical database span attributes by key. */
+  def addAttributes(attributes: Attribute[_]*): Command[A] =
+    copy(telemetry = telemetry.addAttributes(attributes: _*))
+
+  /**
+   * Command is a [[https://typelevel.org/cats/typeclasses/contravariant.html contravariant
+   * functor]].
+   * @group Transformations
+   */
+  def contramap[B](f: B => A): Command[B] =
+    Command(sql, origin, encoder.contramap(f), telemetry)
+
+  @deprecated("Use .to[CaseClass] instead of .gcontramap[CaseClass]", "0.6")
+  def gcontramap[B](implicit ev: Twiddler.Aux[B, A]): Command[B] =
+    contramap(ev.to)
+
+  def to[B](implicit ev: Iso[A, B]): Command[B] =
+    contramap(ev.from)
+
+  def cacheKey: Statement.CacheKey =
+    Statement.CacheKey(sql, encoder.types, Nil)
+
+}
+
+/** @group Companions */
+object Command {
+
+  /**
+   * Command is a [[https://typelevel.org/cats/typeclasses/contravariant.html contravariant
+   * functor]].
+   * @group Typeclass Instances
+   */
+  implicit val CommandContravariant: Contravariant[Command] =
+    new Contravariant[Command] {
+      override def contramap[A, B](fa: Command[A])(f: B => A): Command[B] =
+        fa.contramap(f)
+    }
+
+}
